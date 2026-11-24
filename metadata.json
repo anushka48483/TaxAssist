@@ -1,0 +1,6 @@
+{
+  "name": "TaxShield MCP — Secure AI Income Tax Filing Assistant",
+  "description": "MCP-based secure AI-powered Indian income tax filing assistant featuring OCR and PDF financial extraction, cross-document reconciliation, deterministic Old vs New regime tax engine, RAG statutory knowledge retrieval, human-in-the-loop Security Gateway approvals, PII masking, and ITR-1 JSON draft generation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

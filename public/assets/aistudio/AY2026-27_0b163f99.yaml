@@ -1,0 +1,290 @@
+# rules/AY2026-27.yaml
+# Versioned source of truth for the deterministic tax engine and the RAG corpus.
+# Every parameter carries its own source. retrieval_hash / snapshot_path are filled
+# by the fetch script (SHA-256 of the extracted page text + saved snapshot), never by hand.
+
+meta:
+  rules_version: "1.0.0"
+  assessment_year: "AY 2026-27"
+  financial_year: "FY 2025-26"
+  governing_act: "Income-tax Act, 1961"        # NOT Income-tax Act, 2025 (applies from tax year 2026-27)
+  verified_on: "2026-10-20"
+  source_policy:
+    authorities:
+      - "https://www.incometaxindia.gov.in/"   # statute, rules, circulars
+      - "https://www.incometax.gov.in/"        # e-filing / ITR guidance
+    secondary_sources_allowed: false
+    strip_url_tracking_params: true
+  notes:
+    - "Deductions table on incometaxindia.gov.in is labelled AY 2026-27 but reflects the Finance Act, 2026. Re-check nothing in it changes AY 2026-27 values."
+    - "Statute pages on incometaxindia.gov.in exist in several amendment versions; cite the version carrying the Finance Act 2025 notes."
+
+scope:
+  taxpayer:
+    residency: resident_individual
+    age_category: below_senior_citizen
+    employment: salaried
+    employers: 1
+    itr_style: "ITR-1"
+  income_sources: [salary, savings_bank_interest, fixed_deposit_interest]
+  regimes: [old, new]
+  deductions_included:
+    - standard_deduction
+    - section_80C
+    - section_80CCD_1
+    - section_80CCD_1B
+    - section_80CCD_2
+    - section_80D
+    - section_80TTA
+  unsupported:
+    - capital_gains
+    - business_income
+    - foreign_income
+    - multiple_employers
+    - non_resident
+    - senior_citizen
+    - super_senior_citizen
+    - section_80TTB
+    - house_property
+    - surcharge
+    - real_income_tax_department_submission
+
+validation:
+  itr1_income_limit:
+    maximum_total_income: 5000000
+    action_if_exceeded: reject_with_explanation
+    source:
+      authority: "Income Tax Department"
+      url: "https://www.incometax.gov.in/iec/foportal/help/individual/return-applicable-1"
+      section: "ITR-1 (SAHAJ) applicability"
+      document_version: "page last reviewed 09-Jul-2026"
+      retrieval_hash: null
+      snapshot_path: null
+      verified_on: "2026-10-20"
+  surcharge:
+    in_scope: false
+    reason: "Surcharge starts above Rs 50 lakh, which is also the ITR-1 ceiling"
+
+calculation_order:
+  - compute_gross_salary_and_other_income
+  - apply_standard_deduction            # min(amount, salary)
+  - apply_chapter_VIA_deductions        # regime-specific, with caps
+  - total_income_before_rounding
+  - round_total_income                  # Section 288A
+  - compute_slab_tax
+  - apply_87A_rebate_and_marginal_relief
+  - add_cess                            # 4% on tax after rebate
+  - subtract_tds_and_advance_tax
+  - round_net_payable_or_refund         # Section 288B
+
+rounding:
+  total_income:
+    section: "288A"
+    multiple: 10
+    mode: drop_paise_then_half_up
+    source:
+      authority: "Income Tax Department"
+      url: "https://www.incometaxindia.gov.in/w/section-288a-53"
+      section: "Section 288A"
+      retrieval_hash: null
+      snapshot_path: null
+      verified_on: "2026-10-20"
+  amount_payable_or_refund:
+    section: "288B"
+    multiple: 10
+    mode: drop_paise_then_half_up         # use Decimal ROUND_HALF_UP, never Python round()
+    source:
+      authority: "Income Tax Department"
+      url: "https://www.incometaxindia.gov.in/w/section-288b-49"
+      section: "Section 288B"
+      note: "Ignore the original 1966 text (nearest rupee); the amended text is nearest Rs 10."
+      retrieval_hash: null
+      snapshot_path: null
+      verified_on: "2026-10-20"
+
+tax_parameters:
+  old_regime:
+    # Individuals below 60. rate applies to the part of income above lower_bound.
+    slabs:
+      - {lower_bound: 0,       upper_bound: 250000,  rate: 0.00}
+      - {lower_bound: 250000,  upper_bound: 500000,  rate: 0.05}
+      - {lower_bound: 500000,  upper_bound: 1000000, rate: 0.20}
+      - {lower_bound: 1000000, upper_bound: null,    rate: 0.30}
+    standard_deduction:
+      amount: 50000
+      cap_at_salary: true
+      source:
+        authority: "Income Tax Department"
+        url: "https://www.incometaxindia.gov.in/w/deductions-allowable-to-tax-payer"
+        section: "Section 16(ia)"
+        retrieval_hash: null
+        snapshot_path: null
+        verified_on: "2026-10-20"
+    slabs_source:
+      authority: "Income Tax Department"
+      url: "https://www.incometax.gov.in/iec/foportal/help/individual/return-applicable-1"
+      section: "Tax slabs for AY 2026-27 (below 60)"
+      retrieval_hash: null
+      snapshot_path: null
+      verified_on: "2026-10-20"
+
+  new_regime:
+    section: "115BAC(1A)"
+    slabs:
+      - {lower_bound: 0,       upper_bound: 400000,  rate: 0.00}
+      - {lower_bound: 400000,  upper_bound: 800000,  rate: 0.05}
+      - {lower_bound: 800000,  upper_bound: 1200000, rate: 0.10}
+      - {lower_bound: 1200000, upper_bound: 1600000, rate: 0.15}
+      - {lower_bound: 1600000, upper_bound: 2000000, rate: 0.20}
+      - {lower_bound: 2000000, upper_bound: 2400000, rate: 0.25}
+      - {lower_bound: 2400000, upper_bound: null,    rate: 0.30}
+    standard_deduction:
+      amount: 75000
+      cap_at_salary: true
+      source:
+        authority: "Income Tax Department"
+        url: "https://www.incometaxindia.gov.in/w/deductions-allowable-to-tax-payer"
+        section: "Section 16(ia) read with 115BAC(1A)(ii)"
+        retrieval_hash: null
+        snapshot_path: null
+        verified_on: "2026-10-20"
+    slabs_source:
+      authority: "Income Tax Department"
+      url: "https://www.incometax.gov.in/iec/foportal/help/individual/return-applicable-1"
+      section: "Tax slabs for AY 2026-27 (below 60)"
+      retrieval_hash: null
+      snapshot_path: null
+      verified_on: "2026-10-20"
+
+rebate_87A:
+  old_regime:
+    eligible_total_income_max: 500000
+    max_rebate: 12500
+    marginal_relief: false
+  new_regime:
+    eligible_total_income_max: 1200000
+    max_rebate: 60000
+    marginal_relief:
+      enabled: true
+      threshold: 1200000
+      # If total_income > threshold and tax > (total_income - threshold):
+      #   rebate = tax - (total_income - threshold)   -> tax payable = total_income - threshold
+      # Rebate can never exceed tax computed at 115BAC(1A) rates.
+      formula: "rebate = max(0, tax - (total_income - threshold))"
+  source:
+    authority: "Income Tax Department"
+    url: "https://www.incometaxindia.gov.in/w/section-87a-26"
+    section: "Section 87A, first and second provisos"
+    corroboration: "https://www.incometax.gov.in/iec/foportal/help/individual/return-applicable-1"
+    retrieval_hash: null
+    snapshot_path: null
+    verified_on: "2026-10-20"
+
+cess:
+  health_and_education:
+    rate: 0.04
+    applies_to: [income_tax_after_rebate]   # surcharge is out of scope
+    source:
+      authority: "Income Tax Department"
+      url: "https://www.incometax.gov.in/iec/foportal/help/individual/return-applicable-1"
+      section: "Note under 87A rebate table"
+      retrieval_hash: null
+      snapshot_path: null
+      verified_on: "2026-10-20"
+
+deductions:
+  aggregate_cap_groups:
+    80C_80CCC_80CCD1:
+      limit: 150000
+      members: [section_80C, section_80CCC, section_80CCD_1]
+
+  section_80C:
+    group: 80C_80CCC_80CCD1
+    regimes: {old: true, new: false}
+    source:
+      authority: "Income Tax Department"
+      url: "https://www.incometax.gov.in/iec/foportal/help/individual/return-applicable-1"
+      section: "80C, 80CCC, 80CCD(1)"
+      retrieval_hash: null
+      snapshot_path: null
+      verified_on: "2026-10-20"
+
+  section_80CCD_1:
+    group: 80C_80CCC_80CCD1
+    max_percent_of_salary_employee: 10
+    regimes: {old: true, new: false}
+    source:
+      authority: "Income Tax Department"
+      url: "https://www.incometaxindia.gov.in/w/section-80ccd-24"
+      section: "Section 80CCD(1)"
+      retrieval_hash: null
+      snapshot_path: null
+      verified_on: "2026-10-20"
+
+  section_80CCD_1B:
+    max_amount: 50000                      # additional to 80CCD(1)
+    regimes: {old: true, new: false}
+    source:
+      authority: "Income Tax Department"
+      url: "https://www.incometax.gov.in/iec/foportal/help/individual/return-applicable-1"
+      section: "Section 80CCD(1B)"
+      retrieval_hash: null
+      snapshot_path: null
+      verified_on: "2026-10-20"
+
+  section_80CCD_2:
+    input: employer_contribution_from_form_16
+    base: salary_basic_plus_da_if_terms_of_employment_provide   # excludes other allowances and perquisites
+    user_confirms_base: true
+    max_percent_of_base:
+      new_regime: 14                       # all employers (proviso to 80CCD(2))
+      old_regime:
+        central_or_state_government: 14
+        other_employers: 10
+    regimes: {old: true, new: true}
+    source:
+      authority: "Income Tax Department"
+      url: "https://www.incometaxindia.gov.in/w/section-80ccd-24"
+      section: "Section 80CCD(2), proviso and Explanation"
+      retrieval_hash: null
+      snapshot_path: null
+      verified_on: "2026-10-20"
+
+  section_80D:
+    regimes: {old: true, new: false}
+    self_spouse_children:
+      limit_below_60: 25000
+      limit_if_any_person_senior: 50000
+    parents:
+      limit_below_60: 25000
+      limit_if_any_person_senior: 50000
+    preventive_health_checkup:
+      max_amount: 5000
+      included_within_limit: true          # not additional
+    medical_expenditure_senior_no_premium:
+      in_scope: false
+      note: "Rs 50,000 senior-citizen medical expenditure deduction excluded from scope"
+    source:
+      authority: "Income Tax Department"
+      url: "https://www.incometax.gov.in/iec/foportal/help/individual/return-applicable-1"
+      section: "Section 80D (official guidance; statutory text not separately read)"
+      retrieval_hash: null
+      snapshot_path: null
+      verified_on: "2026-10-20"
+
+  section_80TTA:
+    max_amount: 10000
+    applies_to: [savings_bank_interest]
+    excludes: [fixed_deposit_interest]
+    regimes: {old: true, new: false}
+    source:
+      authority: "Income Tax Department"
+      url: "https://www.incometaxindia.gov.in/w/deductions-allowable-to-tax-payer"
+      section: "Section 80TTA"
+      retrieval_hash: null
+      snapshot_path: null
+      verified_on: "2026-10-20"
+
+income_rules:
+  savings_bank_interest: {taxable: true}
+  fixed_deposit_interest: {taxable: true, deduction_under_80TTA: false}

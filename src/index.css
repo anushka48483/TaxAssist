@@ -1,0 +1,66 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --color-canvas: #ffffff;
+  --color-surface-subtle: #f8fafc;
+  --color-ink-primary: #172b4d;
+  --color-ink-secondary: #64748b;
+  --color-brand-blue: #2563eb;
+  --color-brand-blue-hover: #1d4ed8;
+  --color-accent-teal: #0d9488;
+  --color-hairline: #e2e8f0;
+}
+
+@layer base {
+  html {
+    background-color: #ffffff;
+    color: #172b4d;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    color: #172b4d;
+    background-color: #ffffff;
+    line-height: 1.5;
+  }
+
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+
+  :focus-visible {
+    outline: 2px solid #2563eb;
+    outline-offset: 2px;
+  }
+}
+
+@keyframes itrFieldUpdatedFlash {
+  0% {
+    background-color: rgba(37, 99, 235, 0.14);
+    box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.45);
+  }
+  100% {
+    background-color: rgba(248, 250, 252, 0.9);
+    box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.15);
+  }
+}
+
+.itr-field-active {
+  background-color: rgba(239, 246, 255, 0.95);
+  box-shadow: inset 0 0 0 1.5px #2563eb;
+}
+
+.itr-field-just-updated {
+  animation: itrFieldUpdatedFlash 1.4s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .itr-field-just-updated {
+    animation: none;
+  }
+}
+
